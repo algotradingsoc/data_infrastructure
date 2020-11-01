@@ -7,7 +7,7 @@ def rank(data : Table) -> typing.List[str]:
     """
     def sort(table : Table) -> Table:
         """  sorts Table by volumn  """
-        return sorted(table, key=lambda x: x['volumn'])
+        return sorted(table, key=lambda x: x['volumn'], reverse=True)
     return [x['id'] for x in sort(data)]
 
 
