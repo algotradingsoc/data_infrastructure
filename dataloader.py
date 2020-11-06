@@ -24,6 +24,7 @@ class DataLoader(ABC):
         super().__init__()
 
     # load raw data to self.rawdata which is a list of dataframes
+    # Make sure there is no missing dates in the data/ Dataframes needs to have datetimie aligned
     @abstractmethod
     def load_rawdata(self):
         pass
@@ -38,3 +39,13 @@ class DataLoader(ABC):
             for feature in self.features:
                 if feature in ["return"]:
                     pricedata[feature] = pricedata["adj_close"].apply(np.log).diff(1)
+
+
+class CSVDataLoader(DataLoader):
+    def load_rawdata(self):
+        pass
+
+
+class MongoDBDataLoader(DataLoader):
+    def load_rawdata(self):
+        pass
