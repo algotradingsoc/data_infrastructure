@@ -47,7 +47,7 @@ class Data_Loader(ABC):
         super().__init__()
 
     @abstractmethod
-    def load_data(self) -> typing.List[pd.DataFrame]:
+    def load_data(self) -> typing.Dict[str, pd.DataFrame]:
         """
         :return: List of Dataframes (each df represents the time series for a particular stock)
         """
@@ -178,6 +178,7 @@ class Data_Loader_CSV(Data_Loader):
             "return": np.sum,
             "volatility": np.std,
             "skewness": scipy.stats.skew,
+            "kurtosis": scipy.stats.kurtosis,
         }
 
         def compute_split_ratio(entry):
@@ -209,9 +210,7 @@ class Data_Loader_CSV(Data_Loader):
                 f_funcstr = f.split("_")[0]
                 f_lookback = np.int(f.split("_")[1])
                 raw_df[f] = (
-                    raw_df["adjust_close"]
-                    .rolling(f_lookback)
-                    .apply(feature_map[f_funcstr])
+                    raw_df["return"].rolling(f_lookback).apply(feature_map[f_funcstr])
                 )
 
             selected_features = ["return", "tcost"] + features
@@ -253,6 +252,6 @@ if __name__ == "__main__":
     data = data_loader_csv.load_data()
     print(data)
     features = data_loader_csv.compute_features(
-        ["return_5", "volatility_20", "skewness_20"]
+        ["return_5", "volatility_20", "skewness_20", "kurtosis_20"]
     )
     print(features)
