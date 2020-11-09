@@ -120,7 +120,7 @@ class Data_Loader_CSV(Data_Loader):
                 try:
                     row = df.loc[ticker]
                 except:
-                    pass  #TODO: Pass for now, implement method for checking missing data later
+                    pass  # TODO: Pass for now, implement method for checking missing data later
                 df_row = row.to_frame().transpose()
                 df_row["datetime"] = date_time
                 df_row = df_row.set_index("datetime")
@@ -132,7 +132,7 @@ class Data_Loader_CSV(Data_Loader):
                     )
                 except KeyError:
                     data_dict[ticker] = df_row
-        #TODO: A mapping between stock ticker and price data needs to be there
+        # TODO: A mapping between stock ticker and price data needs to be there
         return data_dict
 
     def return_features(self) -> typing.List[str]:
@@ -149,7 +149,7 @@ class Data_Loader_CSV(Data_Loader):
         """
         dt = sorted(list(self.__datetime_filename_HashMap))
 
-        #TODO: How to handle weekend and trading holidays?
+        # TODO: How to handle weekend and trading holidays?
         try:
             start_index = dt.index(self.start)
         except:
@@ -224,23 +224,26 @@ class Data_Loader_CSV(Data_Loader):
 # MongoDB Data Loader
 # =============================================================================
 
+
 class Data_Loader_mongo(Data_Loader):
     """
     Data Loader from mongoDB
     """
-    
-    def __init__(self,datasource: str, 
-                  tickers: typing.List[str],
-                  features: typing.List[str],
-                  start: datetime,
-                  end: datetime
-                  ):
+
+    def __init__(
+        self,
+        datasource: str,
+        tickers: typing.List[str],
+        features: typing.List[str],
+        start: datetime,
+        end: datetime,
+    ):
         """
-         :param datasource: name of database in mongoDB
-         :param tickers: symbols/tickers of the stocks you want to load
-         :param features: features you want to extract
-         :param start: start date
-         :param end: end date ( result includes ending date)
+        :param datasource: name of database in mongoDB
+        :param tickers: symbols/tickers of the stocks you want to load
+        :param features: features you want to extract
+        :param start: start date
+        :param end: end date ( result includes ending date)
         """
         super().__init__(datasource, tickers, features, start, end)
         client = MongoClient()
@@ -248,8 +251,7 @@ class Data_Loader_mongo(Data_Loader):
         if len(self._db.list_collection_names()) == 0:
             raise EmptyDatabase(f"{datasource} is an empty database")
         self._features_list = self.return_features()
-    
-    
+
     def load_data(self) -> typing.Dict[str, pd.DataFrame]:
         """
         :return: List of Dataframes (each df represents the time series for a particular stock)
@@ -258,35 +260,42 @@ class Data_Loader_mongo(Data_Loader):
         if len(self.features) == 0:
             columns = self._features_list
         else:
-            if len(set(self.features).intersection(set(self._features_list))) == len(self.features):
+            if len(set(self.features).intersection(set(self._features_list))) == len(
+                self.features
+            ):
                 features = set(self.features)
                 features.add("symbol")
                 features.add("datetime")
-                columns = list(features)
+                columns = list(set(features))
             else:
-                raise Exception("FeaturesMismatchException: Some input features not present in dataset")
-        
-        columns_dict= {column:1 for column in columns}
-        columns_dict["_id"] = 0   
-        print(columns_dict)
-        
-        data_dict={}
+                raise Exception(
+                    "FeaturesMismatchException: Some input features not present in dataset"
+                )
+
+        columns_dict = {column: 1 for column in columns}
+        columns_dict["_id"] = 0
+
+        data_dict = {}
         for ticker in self.tickers:
             collection = self._db[ticker]
             if collection.count_documents({}) == 0:
                 raise Exception(f"{ticker} collection is empty (check ticker name)")
-        
-            range_query_statement = {'datetime':{"$gte":self.start,"$lte":self.end}}
-            query_result = pd.DataFrame(collection.find(range_query_statement,columns_dict).sort("datetime"))
+
+            range_query_statement = {"datetime": {"$gte": self.start, "$lte": self.end}}
+            query_result = pd.DataFrame(
+                collection.find(range_query_statement, columns_dict).sort("datetime")
+            )
             query_result = query_result.set_index("datetime")
-            
+
             try:
-                data_dict[ticker] = data_dict[ticker].append(query_result, verify_integrity=True)
+                data_dict[ticker] = data_dict[ticker].append(
+                    query_result, verify_integrity=True
+                )
             except KeyError:
                 data_dict[ticker] = query_result
-        
+
         return data_dict
-        
+
     def return_features(self) -> typing.List[str]:
         """
         :return: List of features found in dataset (column names)
@@ -295,7 +304,7 @@ class Data_Loader_mongo(Data_Loader):
         features = list(collection.find_one())
         features.remove("_id")
         return features
-    
+
     def compute_features(
         self, features: typing.List[str]
     ) -> typing.Dict[str, pd.DataFrame]:
@@ -345,6 +354,7 @@ class Data_Loader_mongo(Data_Loader):
 
         return data_dict
 
+
 # =============================================================================
 # Exceptions
 # =============================================================================
@@ -353,8 +363,10 @@ class Data_Loader_mongo(Data_Loader):
 class TimeInvalid(Exception):
     pass
 
+
 class EmptyDatabase(Exception):
     pass
+
 
 # =============================================================================
 # Test
@@ -376,9 +388,8 @@ if __name__ == "__main__":
         ["return_5", "volatility_20", "skewness_20", "kurtosis_20"]
     )
     print(features)
-    
-    
-    #Test MongoDB Loader
+
+    # Test MongoDB Loader
     # data_loader_mongo = Data_Loader_mongo(
     #     "kaggle_db",
     #     ["DIS", "GE", "AAPL"],
@@ -387,10 +398,10 @@ if __name__ == "__main__":
     #     datetime(2016, 11, 7),
     # )
     # data_mongo = data_loader_mongo.load_data()
-    
-    #NOTE: MongoDB loader is complete, 
-    #I am getting still working on getting the csv to mongodb loader. (Basically done, just need to make sure format)
-    #DO NOT run the mongoDB loader without the data loaded into mongoDB.
-    #Apologies for the delay
-    
+
+    # NOTE: MongoDB loader is complete,
+    # I am getting still working on getting the csv to mongodb loader. (Basically done, just need to make sure format)
+    # DO NOT run the mongoDB loader without the data loaded into mongoDB.
+    # Apologies for the delay
+
     pass
