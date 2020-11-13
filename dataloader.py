@@ -318,29 +318,32 @@ class Data_Loader_mongo(Data_Loader):
         }
 
         def compute_split_ratio(entry):
-            if not np.isnan(entry):
+            try:
                 previous_ratio = np.float(entry.split(":")[0])
                 after_ratio = np.float(entry.split(":")[1])
                 return previous_ratio / after_ratio
-            else:
+            except:
                 return 1.0
 
         for ticker, raw_df in raw_data_dict.items():
             # compute adjusted_close with roll forward method,
             # which add the dividend back to the price
-            raw_df["div"] = raw_df["div"].fillna(0)
+            raw_df = raw_df.astype(np.float, errors="ignore")
+            raw_df["div"] = raw_df["div"].replace("", 0.0).astype(np.float)
             raw_df["adjust_cum"] = (
                 raw_df["adjustment"].apply(compute_split_ratio).cumprod()
             )
+
             raw_df["adjust_div"] = raw_df["div"] * raw_df["adjust_cum"]
             raw_df["adjust_close"] = (
-                raw_df["close"] * raw_df["adjust_cum"] + raw_df["adjust_div"].cumsum()
+                raw_df["close"].astype(np.float) * raw_df["adjust_cum"]
+                + raw_df["adjust_div"].cumsum()
             )
             # compute t-cost and return
             raw_df["return"] = raw_df["adjust_close"].apply(lambda x: np.log(x)).diff(1)
-            raw_df["tcost"] = (raw_df["ask"] - raw_df["bid"]) / (
-                raw_df["ask"] + raw_df["bid"]
-            )
+            raw_df["tcost"] = (
+                raw_df["ask"].astype(np.float) - raw_df["bid"].astype(np.float)
+            ) / (raw_df["ask"].astype(np.float) + raw_df["bid"].astype(np.float))
 
             for f in features:
                 f_funcstr = f.split("_")[0]
@@ -374,34 +377,38 @@ class EmptyDatabase(Exception):
 
 if __name__ == "__main__":
 
+    # Test MongoDB Loader
+    data_loader_mongo = Data_Loader_mongo(
+        "Kaggle_US_Equity",
+        [
+            "QQQ",
+            "EEM",
+            "TLT",
+            "LQD",
+            "GLD",
+            "SPY",
+        ],
+        [],
+        datetime(2010, 1, 2),
+        datetime(2020, 11, 7),
+    )
+    data_mongo = data_loader_mongo.load_data()
+    features = data_loader_mongo.compute_features(
+        ["volatility_20", "skewness_20", "kurtosis_20"]
+    )
+    for key, df in features.items():
+        df = df.reset_index().dropna()
+        df.to_csv("data/{}.csv".format(key))
+
     # Test csv loader
     data_loader_csv = Data_Loader_CSV(
         "../data/kaggle_us_eod",
         ["DIS", "GE", "AAPL"],
         [],
-        datetime(2016, 9, 23),
+        datetime(2016, 10, 13),
         datetime(2016, 11, 7),
     )
     data = data_loader_csv.load_data()
-    print(data)
     features = data_loader_csv.compute_features(
-        ["return_5", "volatility_20", "skewness_20", "kurtosis_20"]
+        ["volatility_20", "skewness_20", "kurtosis_20"]
     )
-    print(features)
-
-    # Test MongoDB Loader
-    # data_loader_mongo = Data_Loader_mongo(
-    #     "kaggle_db",
-    #     ["DIS", "GE", "AAPL"],
-    #     [],
-    #     datetime(2016, 9, 23),
-    #     datetime(2016, 11, 7),
-    # )
-    # data_mongo = data_loader_mongo.load_data()
-
-    # NOTE: MongoDB loader is complete,
-    # I am getting still working on getting the csv to mongodb loader. (Basically done, just need to make sure format)
-    # DO NOT run the mongoDB loader without the data loaded into mongoDB.
-    # Apologies for the delay
-
-    pass
