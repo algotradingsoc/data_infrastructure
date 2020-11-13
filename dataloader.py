@@ -398,7 +398,7 @@ if __name__ == "__main__":
     )
     for key, df in features.items():
         df = df.reset_index().dropna()
-        df.to_csv("data/{}.csv".format(key))
+        df.to_csv("data/{}.csv".format(key), index=False)
 
     # Test csv loader
     data_loader_csv = Data_Loader_CSV(
