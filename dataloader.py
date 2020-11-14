@@ -117,21 +117,22 @@ class Data_Loader_CSV(Data_Loader):
             )
 
             for ticker in self.tickers:
+                df_row = None
                 try:
                     row = df.loc[ticker]
+                    df_row = row.to_frame().transpose()
+                    df_row["datetime"] = date_time
+                    df_row = df_row.set_index("datetime")
+                    df_row.insert(loc=0, column="symbol", value=ticker)
                 except:
                     pass  # TODO: Pass for now, implement method for checking missing data later
-                df_row = row.to_frame().transpose()
-                df_row["datetime"] = date_time
-                df_row = df_row.set_index("datetime")
-                df_row.insert(loc=0, column="symbol", value=ticker)
-
                 try:
                     data_dict[ticker] = data_dict[ticker].append(
                         df_row, verify_integrity=True
                     )
                 except KeyError:
-                    data_dict[ticker] = df_row
+                    if not df_row is None:
+                        data_dict[ticker] = df_row
         # TODO: A mapping between stock ticker and price data needs to be there
         return data_dict
 
@@ -341,6 +342,8 @@ class Data_Loader_mongo(Data_Loader):
             )
             # compute t-cost and return
             raw_df["return"] = raw_df["adjust_close"].apply(lambda x: np.log(x)).diff(1)
+            raw_df["ask"] = raw_df["ask"].replace("", 0.0)
+            raw_df["bid"] = raw_df["bid"].replace("", 0.0)
             raw_df["tcost"] = (
                 raw_df["ask"].astype(np.float) - raw_df["bid"].astype(np.float)
             ) / (raw_df["ask"].astype(np.float) + raw_df["bid"].astype(np.float))
@@ -352,7 +355,7 @@ class Data_Loader_mongo(Data_Loader):
                     raw_df["return"].rolling(f_lookback).apply(feature_map[f_funcstr])
                 )
 
-            selected_features = ["return", "tcost"] + features
+            selected_features = ["return", "tcost", "adjust_close"] + features
             data_dict[ticker] = raw_df[selected_features]
 
         return data_dict
@@ -382,14 +385,14 @@ if __name__ == "__main__":
         "Kaggle_US_Equity",
         [
             "QQQ",
-            "EEM",
-            "TLT",
-            "LQD",
-            "GLD",
+            "QQQQ",
+            "SBC",
+            "T",
+            "BRK",
             "SPY",
         ],
         [],
-        datetime(2010, 1, 2),
+        datetime(1992, 1, 2),
         datetime(2020, 11, 7),
     )
     data_mongo = data_loader_mongo.load_data()
@@ -398,17 +401,5 @@ if __name__ == "__main__":
     )
     for key, df in features.items():
         df = df.reset_index().dropna()
+        print(key, df)
         df.to_csv("data/{}.csv".format(key), index=False)
-
-    # Test csv loader
-    data_loader_csv = Data_Loader_CSV(
-        "../data/kaggle_us_eod",
-        ["DIS", "GE", "AAPL"],
-        [],
-        datetime(2016, 10, 13),
-        datetime(2016, 11, 7),
-    )
-    data = data_loader_csv.load_data()
-    features = data_loader_csv.compute_features(
-        ["volatility_20", "skewness_20", "kurtosis_20"]
-    )
