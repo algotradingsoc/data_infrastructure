@@ -527,16 +527,14 @@ class Data_Loader_mongo_V2(Data_Loader):
 
             for ticker_one_class in tickers_all_class:
 
-                print(ticker_one_class)
-
                 ticker = ticker_one_class["ticker"]
                 class_of_ticker = ticker_one_class["class"]
 
                 query_statement = {
                     "ticker": ticker,
                     "class": class_of_ticker,
-                    "start": {"$gte": self.start},
-                    "end": {"$lte": self.end},
+                    # "start": {"$lte": self.start},
+                    "end": {"$gte": self.end},
                 }
 
                 result = collection.find_one(query_statement, {"_id": 0})

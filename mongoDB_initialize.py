@@ -5,6 +5,8 @@ from pymongo import MongoClient
 
 from datetime import datetime
 
+import pandas as pd
+
 client = MongoClient()
 
 # =============================================================================
@@ -132,10 +134,45 @@ def create_database_id(db_name, data_directory):
         ticker_id_meta_data.insert_one(row)
 
 
+def create_ticker_id_map(db_name):
+
+    db = client[db_name]
+    ticker_id_meta_data = db["ticker_id_meta_data"]
+    ticker_id_meta_data.create_index(
+        [
+            ("ticker", pymongo.ASCENDING),
+            ("class", pymongo.ASCENDING),
+            ("start", pymongo.ASCENDING),
+            ("end", pymongo.ASCENDING),
+        ],
+        unique=True,
+    )
+
+    collection_list = db.list_collection_names()
+    for cname in collection_list:
+        print(cname)
+        df = pd.DataFrame(db[cname].find()).sort_values("datetime")
+        start_symbol = df.groupby(["symbol", "class"]).first()
+        end_symbol = df.groupby(["symbol", "class"]).last()
+        symbol = start_symbol[["finnhub_id"]]
+        symbol["start"] = start_symbol["datetime"]
+        symbol["end"] = end_symbol["datetime"]
+        symbol.reset_index(inplace=True)
+        print(symbol)
+        try:
+            ticker_id_meta_data.insert_many(symbol.to_dict("records"))
+        except pymongo.errors.BulkWriteError as e:
+            print(e.details["writeErrors"])
+
+
 if __name__ == "__main__":
 
+    create_ticker_id_map(
+        "kaggle_US_Equity_daily",
+    )
+
     # Test Create Database
-    create_database_id("kaggle_US_Equity_daily", "../data/kaggle_us_eod")
+    # create_database_id("kaggle_US_Equity_daily", "../data/kaggle_us_eod")
 
     """
     Change "kaggle_db" to any name you want the database to be called
