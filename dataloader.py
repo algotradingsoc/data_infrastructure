@@ -417,6 +417,7 @@ class Data_Loader_mongo_V2(Data_Loader):
         columns_dict["_id"] = 0
 
         tickers_new = self.__match_ticker_finnhub_id()
+        print(tickers_new)
 
         data_dict = {}
         for ticker_class, values in tickers_new.items():
@@ -521,27 +522,28 @@ class Data_Loader_mongo_V2(Data_Loader):
 
         tickers_new = {}
         for ticker in self.tickers:
-            query_statement_ticker = {"ticker": ticker}
+            query_statement_ticker = {"symbol": ticker}
 
             tickers_all_class = collection.find(query_statement_ticker, {"_id": 0})
 
             for ticker_one_class in tickers_all_class:
-
-                ticker = ticker_one_class["ticker"]
+                ticker = ticker_one_class["symbol"]
                 class_of_ticker = ticker_one_class["class"]
 
                 query_statement = {
-                    "ticker": ticker,
+                    "symbol": ticker,
                     "class": class_of_ticker,
                     # "start": {"$lte": self.start},
                     "end": {"$gte": self.end},
                 }
 
                 result = collection.find_one(query_statement, {"_id": 0})
-
-                tickers_new[result["ticker"] + "_" + result["class"]] = [
-                    (result["finnhub_id"], self.start, self.end)
-                ]
+                try:
+                    tickers_new[result["symbol"] + "_" + result["class"]] = [
+                        (result["finnhub_id"], self.start, self.end)
+                    ]
+                except:
+                    pass
 
         return tickers_new
 
@@ -596,39 +598,17 @@ class EmptyDatabase(Exception):
 if __name__ == "__main__":
 
     # Test MongoDB Loader
-    data_loader_mongo = Data_Loader_mongo(
-        "kaggle_US_Equity_daily",
-        [
-            "FH571101E21",  # QQQ
-            "FH57539854",  # TLT
-            "FH19578121",  # BRK A
-            "FH89574V21",  # GLD
-        ],
-        [],
-        datetime(1992, 1, 2),
-        datetime(2020, 11, 7),
-    )
-    data_mongo = data_loader_mongo.load_data()
-    features = data_loader_mongo.compute_features(
-        ["volatility_20", "skewness_20", "kurtosis_20"]
-    )
-    for key, df in features.items():
-        df = df.reset_index().dropna()
-        print(key, df)
-        df.to_csv("data/{}.csv".format(key), index=False)
-
-    # Test MongoDB Loader
     data_loader_mongo = Data_Loader_mongo_V2(
         "kaggle_US_Equity_daily",
         [
             "T",  # QQQ
             "GS",  # TLT
             "GE",  # BRK A
-            "YHOO",  # GLD
+            "QQQ",  # GLD
         ],
         [],
         datetime(1992, 1, 2),
-        datetime(2019, 12, 31),
+        datetime(2019, 12, 30),
     )
 
     features = data_loader_mongo.compute_features(
