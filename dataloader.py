@@ -417,7 +417,6 @@ class Data_Loader_mongo_V2(Data_Loader):
         columns_dict["_id"] = 0
 
         tickers_new = self.__match_ticker_finnhub_id()
-        print(tickers_new)
 
         data_dict = {}
         for ticker_class, values in tickers_new.items():
@@ -485,28 +484,36 @@ class Data_Loader_mongo_V2(Data_Loader):
             raw_df["adjust_cum"] = (
                 raw_df["adjustment"].apply(compute_split_ratio).cumprod()
             )
-
+            raw_df["adjvolume"] = (
+                raw_df["volume"].astype(np.float) / raw_df["adjust_cum"]
+            )
             raw_df["adjust_div"] = raw_df["div"] * raw_df["adjust_cum"]
-            raw_df["adjust_close"] = (
+            raw_df["adjclose"] = (
                 raw_df["close"].astype(np.float) * raw_df["adjust_cum"]
                 + raw_df["adjust_div"].cumsum()
             )
             # compute t-cost and return
             raw_df["ask"] = raw_df["ask"].replace("", 0.0)
             raw_df["bid"] = raw_df["bid"].replace("", 0.0)
-            raw_df["return"] = raw_df["adjust_close"].apply(lambda x: np.log(x)).diff(1)
+            raw_df["return"] = raw_df["adjclose"].apply(lambda x: np.log(x)).diff(1)
             raw_df["tcost"] = (
                 raw_df["ask"].astype(np.float) - raw_df["bid"].astype(np.float)
             ) / (raw_df["ask"].astype(np.float) + raw_df["bid"].astype(np.float))
 
             for f in features:
-                f_funcstr = f.split("_")[0]
-                f_lookback = np.int(f.split("_")[1])
+                f_field = f.split("_")[0]
+                f_funcstr = f.split("_")[1]
+                f_lookback = np.int(f.split("_")[2])
                 raw_df[f] = (
-                    raw_df["return"].rolling(f_lookback).apply(feature_map[f_funcstr])
+                    raw_df[f_field].rolling(f_lookback).apply(feature_map[f_funcstr])
                 )
 
-            selected_features = ["return", "tcost"] + features
+            selected_features = [
+                "return",
+                "tcost",
+                "adjclose",
+                "adjvolume",
+            ] + features
             data_dict[ticker] = raw_df[selected_features]
 
         return data_dict
@@ -547,51 +554,18 @@ class Data_Loader_mongo_V2(Data_Loader):
 
         return tickers_new
 
-
-"""                 
-                query_statement_start = {
-                    "ticker": ticker,
-                    "class": class_of_ticker,
-                    "start": {"$lte": self.start},
-                    "end": {"$gte": self.start},
-                }
-                query_statement_end = {
-                    "ticker": ticker,
-                    "class": class_of_ticker,
-                    "start": {"$lte": self.end},
-                    "end": {"$gte": self.end},
-                }
-
-                result_start = collection.find_one(query_statement_start, {"_id": 0})
-                result_end = collection.find_one(query_statement_end, {"_id": 0})
-
-                if result_start["finnhub_id"] == result_end["finnhub_id"]:
-                    tickers_new[
-                        result_start["ticker"] + "_" + result_start["class"]
-                    ] = [(result_start["finnhub_id"], self.start, self.end)]
-                else:
-                    tickers_new[
-                        result_start["ticker"] + "_" + result_start["class"]
-                    ] = [
-                        (result_start["finnhub_id"], self.start, result_start["end"]),
-                        (result_end["finnhub_id"], result_end["start"], self.end),
-                    ] """
-
-
     def get_date_range(self):
         raw_data_dict = self.load_data()
-        
         tickers = raw_data_dict.keys()
-        
         date_range = {}
-        
         for one_ticker in tickers:
             df = raw_data_dict[one_ticker]
             listing = df.index[0]
             delisting = df.index[-1]
-            date_range[one_ticker] = [(listing,delisting)]
-            
+            date_range[one_ticker] = [(listing, delisting)]
+
         return date_range
+
 
 # =============================================================================
 # Exceptions
@@ -616,10 +590,10 @@ if __name__ == "__main__":
     data_loader_mongo = Data_Loader_mongo_V2(
         "kaggle_US_Equity_daily",
         [
-            "T",  # QQQ
-            "GS",  # TLT
-            "GE",  # BRK A
-            "QQQ",  # GLD
+            "T",
+            "GS",
+            "GE",
+            "AAPL",
         ],
         [],
         datetime(1992, 1, 2),
@@ -627,7 +601,12 @@ if __name__ == "__main__":
     )
 
     features = data_loader_mongo.compute_features(
-        ["volatility_20", "skewness_20", "kurtosis_20"]
+        [
+            "return_volatility_20",
+            "return_skewness_20",
+            "return_kurtosis_20",
+            "adjvolume_volatility_20",
+        ]
     )
     for key, df in features.items():
         df = df.reset_index().dropna()
