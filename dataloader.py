@@ -578,6 +578,21 @@ class Data_Loader_mongo_V2(Data_Loader):
                     ] """
 
 
+    def get_date_range(self):
+        raw_data_dict = self.load_data()
+        
+        tickers = raw_data_dict.keys()
+        
+        date_range = {}
+        
+        for one_ticker in tickers:
+            df = raw_data_dict[one_ticker]
+            listing = df.index[0]
+            delisting = df.index[-1]
+            date_range[one_ticker] = [(listing,delisting)]
+            
+        return date_range
+
 # =============================================================================
 # Exceptions
 # =============================================================================
