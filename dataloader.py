@@ -554,6 +554,16 @@ class Data_Loader_mongo_V2(Data_Loader):
 
         return tickers_new
 
+
+    def __match_ticker_finnhub_id_advance(
+            self,
+        ) -> typing.Dict[str, typing.List[typing.Tuple[str, datetime, datetime]]]:
+        """
+        #WIP: maps start date and end date to a range of date (needs the trading calendar class) 
+        :return: A dictionary with the key being the ticker + class and the value being the finnhub id and start and end dates
+        """
+        pass
+
     def get_date_range(self):
         raw_data_dict = self.load_data()
         tickers = raw_data_dict.keys()
