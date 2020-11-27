@@ -22,6 +22,12 @@ https://www.kaggle.com/finnhub/reported-financials
 https://www.kaggle.com/finnhub/end-of-day-us-market-data-survivorship-bias-free     
 https://www.quandl.com/data/FINRA-Financial-Industry-Regulatory-Authority  
 
+Calendar for US Equities
+Installation
+```bash
+pip install pandas_market_calendars
+```
+https://github.com/rsheftel/pandas_market_calendars
 
 ## Project stages 
 
