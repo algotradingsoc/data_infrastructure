@@ -10,7 +10,7 @@ df_sorted = df_tickers.sort_values(by=['end'],ascending = False).reset_index(dro
 
 symbol_list = df_sorted.symbol
 
-key='2HBDSP7VQOMUNO4'  # Change it to your own requested API key from Alphavantage
+key= 'demo'  # CHANGE it to YOUR OWN requested API key from Alphavantage
 
 y = range(1,3)
 m = range(1,13)
