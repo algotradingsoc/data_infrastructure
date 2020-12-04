@@ -487,6 +487,9 @@ class Data_Loader_mongo_V2(Data_Loader):
             raw_df["adjvolume"] = (
                 raw_df["volume"].astype(np.float) / raw_df["adjust_cum"]
             )
+            raw_df["adjvolumeratio"] = (
+                raw_df["adjvolume"] / raw_df["adjvolume"].rolling(20).mean()
+            )
             raw_df["adjust_div"] = raw_df["div"] * raw_df["adjust_cum"]
             raw_df["adjclose"] = (
                 raw_df["close"].astype(np.float) * raw_df["adjust_cum"]
@@ -513,6 +516,7 @@ class Data_Loader_mongo_V2(Data_Loader):
                 "tcost",
                 "adjclose",
                 "adjvolume",
+                "adjvolumeratio",
             ] + features
             data_dict[ticker] = raw_df[selected_features]
 
@@ -554,12 +558,11 @@ class Data_Loader_mongo_V2(Data_Loader):
 
         return tickers_new
 
-
     def __match_ticker_finnhub_id_advance(
-            self,
-        ) -> typing.Dict[str, typing.List[typing.Tuple[str, datetime, datetime]]]:
+        self,
+    ) -> typing.Dict[str, typing.List[typing.Tuple[str, datetime, datetime]]]:
         """
-        #WIP: maps start date and end date to a range of date (needs the trading calendar class) 
+        #WIP: maps start date and end date to a range of date (needs the trading calendar class)
         :return: A dictionary with the key being the ticker + class and the value being the finnhub id and start and end dates
         """
         pass
@@ -604,10 +607,13 @@ if __name__ == "__main__":
             "GS",
             "GE",
             "AAPL",
+            "BRK",
+            "GOLD",
+            "TLT",
         ],
         [],
         datetime(1992, 1, 2),
-        datetime(2019, 12, 30),
+        datetime(2019, 12, 31),
     )
 
     features = data_loader_mongo.compute_features(
