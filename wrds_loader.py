@@ -1,6 +1,8 @@
 import os
 import wrds
+import csv
 import typing
+import random
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -74,9 +76,19 @@ class wrds_loader(ABC):
 
 class wrds_loader_option_metrics(wrds_loader):
     
-    def __init__(self):
+    def __init__(self,transform_tickers:bool = False, prefix:str ="stock", starting_int:int = 1, random_increment:bool = False):
+        """
+        :param transform_tickers: whether to transform the tickers or not
+        :param prefix: new ticker name before number (i.e. stock => stock_01, s => s_01)
+        :param starting_int: starting number for transformed ticker
+        :param random_increment: whether the name is incremented by 1 or a random number between 2 and 100
+        """
         super().__init__("optionm","securd1")
-    
+        self.transform_tickers = transform_tickers
+        if transform_tickers == True:
+            self.ticker_to_transformed = self.generate_transformed_tickers(prefix, starting_int, random_increment)
+        else:
+            self.ticker_to_transformed = None
     
     def load_table_all(self, start:datetime, end:datetime, other_table_name:str, columns:typing.List[str] = [], limit:int=10) -> typing.Dict[str,pd.DataFrame]:
         """
@@ -94,11 +106,30 @@ class wrds_loader_option_metrics(wrds_loader):
         query = f"select id.ticker from {self.library}.{self.meta_table_name} as id join {self.library}.{other_table_name} as data on id.secid = data.secid where date(data.date) >= '{start_format}' and date(data.date) <= '{end_format}'"
         tickers = self.db.raw_sql(query)
         output = {}
-        for ticker in tickers["ticker"]:
-            if ticker != None:
-                df = self.__load_table_one(ticker, start, end, other_table_name,columns, limit)
-                output[ticker] = df
-                
+        if self.transform_tickers  == True:
+              for ticker in tickers["ticker"]:
+                      if ticker != None:
+                        df = self.__load_table_one(ticker, start, end, other_table_name,columns, limit)
+                        secids = set(df["secid"])
+                        if len(secids) > 1:
+                            new_ticker = set()
+                            for secid in secids:
+                                new_ticker.add(self.ticker_to_transformed[int(secid)][1])
+                            if len(new_ticker) > 1:
+                                raise Exception("multiple new tickers for ticker, check!")
+                            else:
+                                df["ticker"] = new_ticker
+                                output[new_ticker] = df
+                        else:
+                            new_ticker = self.ticker_to_transformed[int(secids.pop())][1]
+                            df["ticker"] = new_ticker
+                            output[new_ticker] = df   
+        else:
+            for ticker in tickers["ticker"]:
+                if ticker != None:
+                    df = self.__load_table_one(ticker, start, end, other_table_name,columns, limit)
+                    output[ticker] = df
+
         return output
     
     
@@ -116,6 +147,22 @@ class wrds_loader_option_metrics(wrds_loader):
         
         df = self.__load_table_one(ticker, start, end, other_table_name,columns, limit)
         
+        if self.transform_tickers  == True:
+            secids = set(df["secid"])
+            if len(secids) > 1:
+                new_ticker = set()
+                for secid in secids:
+                    new_ticker.add(self.ticker_to_transformed[int(secid)][1])
+                if len(new_ticker) > 1:
+                    raise Exception("multiple new tickers for ticker, check!")
+                else:
+                    df["ticker"] = new_ticker
+                    ticker = new_ticker
+            else:
+                new_ticker = self.ticker_to_transformed[int(secids.pop())][1]
+                df["ticker"] = new_ticker
+                ticker = new_ticker
+                
         return {ticker:df}
         
         
@@ -131,11 +178,58 @@ class wrds_loader_option_metrics(wrds_loader):
         :return: Dict of Dataframes (each df represents the time series for a particular ticker)
         """
         output = {}
-        for ticker in tickers:
-            df = self.__load_table_one(ticker, start, end, other_table_name,columns, limit)
-            output[ticker] = df
+        if self.transform_tickers  == True:
+            for ticker in tickers:
+                df = self.__load_table_one(ticker, start, end, other_table_name,columns, limit)
+                secids = set(df["secid"])
+                if len(secids) > 1:
+                    new_ticker = set()
+                    for secid in secids:
+                        new_ticker.add(self.ticker_to_transformed[int(secid)][1])
+                    if len(new_ticker) > 1:
+                        raise Exception("multiple new tickers for ticker, check!")
+                    else:
+                        df["ticker"] = new_ticker
+                        output[new_ticker] = df
+                else:
+                    new_ticker = self.ticker_to_transformed[int(secids.pop())][1]
+                    df["ticker"] = new_ticker
+                    output[new_ticker] = df
+        else: 
+            for ticker in tickers:
+                df = self.__load_table_one(ticker, start, end, other_table_name,columns, limit)
+                output[ticker] = df
     
         return output
+    
+    def generate_transformed_tickers(self,prefix:str,start:int,random_increment:bool) -> typing.Dict[int,typing.Tuple[str,str]]:
+        """
+        :param prefix: new ticker name before number (i.e. stock => stock_01, s => s_01)
+        :param start: starting number for increment 
+        :param random_increment: whether the name is incremented by 1 or a random number between 2 and 100
+
+        :return: Dict with secid as key and (ticker name, new transformed ticker name) as value 
+        """
+        if prefix != "":
+            prefix += "_"
+        
+        if random_increment == True:
+            increment = random.randint(2, 100)
+        else:
+            increment = 1
+        
+        ticker_to_random = {}
+        for row in self.ticker_id.to_numpy():
+            ticker_to_random[int(row[0])] = (row[2],prefix+str(start))
+            start += increment
+        
+        return ticker_to_random
+    
+    def save_tickers_hashmap(self):
+        pass
+    
+    def save_as_csv(self,results:typing.Dict[str,pd.DataFrame]):
+        pass
     
     def __load_table_one(self,ticker:str, start:datetime, end:datetime, other_table_name:str,columns:typing.List[str] = [], limit:int=10) -> pd.DataFrame:
         """
@@ -160,6 +254,8 @@ class wrds_loader_option_metrics(wrds_loader):
             else:
                 if "date" not in columns:
                     columns.append("date")
+                if "secid" not in columns:
+                    columns.append("secid")
                 columns_string = ', '.join([f"data.{column}" for column in columns])
                 if limit != 0:
                     query = f"select id.ticker, {columns_string} from {self.library}.{self.meta_table_name} as id join {self.library}.{other_table_name} as data on id.secid = data.secid where id.ticker = '{ticker}' and date(data.date) >= '{start_format}' and date(data.date) <= '{end_format}' limit {limit}"
@@ -173,6 +269,16 @@ class wrds_loader_option_metrics(wrds_loader):
         
         return self.db.raw_sql(query,date_cols=["date"],index_col=["date"])
     
+    
+# =============================================================================
+# Compustats Data Loader
+# =============================================================================
+
+
+
+# =============================================================================
+# Simple Tutorial
+# =============================================================================
 
 if __name__ == "__main__":
     
@@ -198,4 +304,4 @@ if __name__ == "__main__":
     
     data_multi = loader.load_table_specific_multi(tickers, start_date, end_date, table_name)
     
-    loader.db.close()
+    loader.close_connection()
